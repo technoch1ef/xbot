@@ -59,6 +59,13 @@ export interface ServerDeps {
   webhook: WebhookOptions;
   /** Structured logger for server-level events. */
   logger: Logger;
+  /**
+   * Optional liveness probe for the `/health` endpoint. When provided and it
+   * returns false, `/health` responds 503 so orchestrators can detect that the
+   * poller (the bot's primary ingestion path) is no longer running. When
+   * omitted, `/health` always reports healthy.
+   */
+  livenessProbe?: () => boolean;
 }
 
 /** Shape of the CRC challenge query string. */
@@ -82,11 +89,15 @@ function headerValue(value: string | string[] | undefined): string | undefined {
  * @returns A configured {@link FastifyInstance}.
  */
 export function createServer(deps: ServerDeps): FastifyInstance {
-  const { pipeline, webhook, logger } = deps;
+  const { pipeline, webhook, logger, livenessProbe } = deps;
   const app = Fastify({ logger: false });
 
-  // Liveness probe — always available, regardless of the webhook flag.
-  app.get("/health", async () => ({ status: "ok" }));
+  // Liveness probe — always available, regardless of the webhook flag. Reports
+  // poller liveness when a probe is supplied so a wedged poller surfaces as 503.
+  app.get("/health", async (_request, reply) => {
+    const alive = livenessProbe ? livenessProbe() : true;
+    return reply.code(alive ? 200 : 503).send({ status: alive ? "ok" : "unhealthy" });
+  });
 
   if (!webhook.enabled) {
     logger.info({ stage: "server" }, "webhook receiver disabled; only /health mounted");
