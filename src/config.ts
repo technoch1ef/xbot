@@ -67,6 +67,28 @@ const ConfigSchema = z
       .default(5),
     DRY_RUN: booleanFromString.default("false"),
 
+    // --- HTTP server (health + optional webhook receiver) ---
+    PORT: z.coerce
+      .number({ invalid_type_error: "must be a number" })
+      .int("must be an integer")
+      .min(0, "must be >= 0")
+      .max(65535, "must be <= 65535")
+      .default(3000),
+    HOST: z.string().trim().min(1).default("0.0.0.0"),
+
+    // --- Optional Account Activity API (AAA) webhook receiver ---
+    // Off by default; AAA access is Enterprise-only. When enabled, a Fastify
+    // route handles the CRC challenge and verified push events, reusing the
+    // same reply pipeline as the poller.
+    WEBHOOK_ENABLED: booleanFromString.default("false"),
+    // Path the webhook routes are mounted at (GET = CRC, POST = events).
+    WEBHOOK_PATH: z
+      .string()
+      .trim()
+      .min(1)
+      .regex(/^\//, "must start with '/'")
+      .default("/webhook/twitter"),
+
     // --- Inbound mention filtering (all optional) ---
     // Comma-separated user IDs and/or @handles to never reply to.
     BLOCKLIST: z.string().trim().optional(),
