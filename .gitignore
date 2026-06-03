@@ -17,3 +17,6 @@ yarn-error.log*
 
 # OS
 .DS_Store
+
+# bv (beads viewer) local config and caches
+.bv/
