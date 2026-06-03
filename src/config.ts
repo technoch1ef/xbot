@@ -67,6 +67,13 @@ const ConfigSchema = z
       .default(5),
     DRY_RUN: booleanFromString.default("false"),
 
+    // --- Inbound mention filtering (all optional) ---
+    // Comma-separated user IDs and/or @handles to never reply to.
+    BLOCKLIST: z.string().trim().optional(),
+    // Comma-separated BCP-47 language codes to allow. When unset, all
+    // languages are allowed; when set, mentions in other languages are skipped.
+    ALLOWED_LANGUAGES: z.string().trim().optional(),
+
     // --- Persona (inline prompt OR a path to a prompt file) ---
     PERSONA_PROMPT: z.string().trim().min(1).optional(),
     PERSONA_PROMPT_PATH: z.string().trim().min(1).optional(),
