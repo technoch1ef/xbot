@@ -1,0 +1,37 @@
+# Build context hygiene: keep the image small and avoid leaking local state.
+
+# Dependencies are installed fresh inside the build stages.
+node_modules/
+
+# Build output is produced inside the image.
+dist/
+
+# Secrets and local env — must never be copied into an image layer.
+.env
+.env.local
+.env.*.local
+
+# Local SQLite databases (the container uses a mounted volume instead).
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Version control and issue-tracker state.
+.git/
+.gitignore
+.beads/
+.bv/
+
+# Tooling / editor / OS cruft not needed at build or runtime.
+.prettierrc.json
+eslint.config.js
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docs and meta — not needed inside the runtime image.
+README.md
+Dockerfile
+.dockerignore

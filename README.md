@@ -160,42 +160,34 @@ npm start       # node dist/index.js
 
 ### Docker
 
-A minimal image (note: `better-sqlite3` needs a build toolchain in the builder
-stage):
+A production [`Dockerfile`](./Dockerfile) is included. It is a multi-stage
+build that produces a slim, non-root runtime image:
 
-```dockerfile
-# Dockerfile
-FROM node:20-slim AS build
-WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
-    && rm -rf /var/lib/apt/lists/*
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM node:20-slim
-WORKDIR /app
-ENV NODE_ENV=production
-COPY package*.json ./
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
-    && npm ci --omit=dev \
-    && apt-get purge -y python3 make g++ && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
-COPY --from=build /app/dist ./dist
-COPY prompts ./prompts
-VOLUME ["/data"]
-ENV DATABASE_PATH=/data/xbot.db
-CMD ["node", "dist/index.js"]
-```
+- **Native build packages.** `better-sqlite3` compiles a C++ addon from source
+  during `npm ci`, so the build stages install `python3`, `make`, and `g++`
+  (node-gyp's toolchain). These never reach the final runtime image.
+- **Non-root.** The worker runs as the unprivileged `node` user.
+- **Persistent volume.** `DATABASE_PATH` defaults to `/data/xbot.db` and `/data`
+  is a `VOLUME`, so the mentions cursor and reply-dedupe history survive
+  restarts — otherwise the bot may re-reply to old mentions.
+- **Healthcheck.** Liveness is a process check on the worker (`pgrep`), since
+  the `/health` HTTP endpoint is only served when `WEBHOOK_ENABLED=true` while
+  the poller always runs.
+- **No baked secrets.** All credentials are supplied at runtime via the
+  environment (e.g. `--env-file`); nothing sensitive is copied into a layer.
 
 ```bash
 docker build -t xbot .
+
+# Real run (mount a volume so the SQLite DB persists across restarts):
 docker run --rm --env-file .env -v "$PWD/data:/data" xbot
+
+# Dry run (no posting) — exercise the full pipeline safely:
+docker run --rm --env-file .env -e DRY_RUN=true -v "$PWD/data:/data" xbot
 ```
 
-Mount a volume for `DATABASE_PATH` so the cursor and reply-dedupe history
-survive restarts — otherwise the bot may re-reply to old mentions.
+To expose the optional health/webhook server, set `WEBHOOK_ENABLED=true` and
+publish the port: `-e WEBHOOK_ENABLED=true -p 3000:3000`.
 
 ---
 
